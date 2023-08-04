@@ -18,6 +18,11 @@
 
     <div v-if="matchStatus===MatchStatus.CREATED">
       <p>잠시후 시작합니다.</p>
+      <p>{{sessionId}}</p>
+      <p>{{memberToken}}</p>
+      <p>{{memberId}}</p>
+
+      <button @click="start">시작</button>
     </div>
 
   </div>
@@ -42,11 +47,20 @@ export default {
       memberId:"",
       second: "",
       matchStatus: MatchStatus.READY,
+      sessionId:"",
+      memberToken:"",
     }
   },
   methods: {
     match() {
+      /**
+       * Todo
+       * 매칭 시작 버튼 비활성화 꼭 해주어야함!
+       */
+
       this.matchStatus = MatchStatus.MATCHING;
+
+      // process.env.VUE_APP_MATCH_ENDPOINT_URI 는 /endpoint
       this.client = Stomp.client(process.env.VUE_APP_MATCH_ENDPOINT_URL);
       this.client.connect(
           {},
@@ -56,22 +70,46 @@ export default {
                 (frame)=>{
                   let response = JSON.parse(frame.body);
                   if(response.success){
-                    if(response.second){
-                      this.second = response.second;
-                    }else{
-                      this.matchStatus = response.matchStatus;
-                      this.memberId = response.memberId;
-                      this.groupId = response.groupId;
+                    this.matchStatus = response.matchStatus;
 
-                      // matchStatus 가 created 상태라면 game page로 memberId + groupId 와 함께 넘어가야함
+                    if(response.matchStatus===MatchStatus.MATCHED){
+                      if(response.second){
+                        this.second = response.second;
+                      }else{
+                        this.matchStatus = response.matchStatus;
+                        this.memberId = response.memberId;
+                        this.groupId = response.groupId;
+                      }
+
+                    }else if(response.matchStatus===MatchStatus.CREATED){
+                      /**
+                       * ToDo
+                       * matchStatus 가 CREATED 상태가 되면 game page로 이동
+                       * groupId, memberId 와 함께 넘어가야함
+                       */
+                      this.memberToken = response.memberToken;
+                      this.sessionId = response.sessionId;
+
                     }
                   }
                 },
                 (error)=>{
+                  /**
+                   * ToDo
+                   * 에러 처리
+                   * 인터넷 연결, 브라우저 오류 등의 문제로 소켓 연결 실패시 실행되는 callback
+                   */
+
                   console.log(error);
                 });
           },
           (error)=>{
+            /**
+             * ToDo
+             * 에러 처리
+             * 인터넷 연결, 브라우저 오류 등의 문제로 소켓 연결 실패시 실행되는 callback
+             */
+
             console.log(error)
           },
       )
@@ -83,8 +121,21 @@ export default {
       this.matchStatus = MatchStatus.READY;
     },
     enter(){
+      /**
+       * ToDo
+       * 수락 버튼을 누르면 수락 버튼을 꼭 비활성화 해주세요!
+       */
       this.client.send(`/enter/${this.groupId}/${this.memberId}`);
     },
+    start(){
+      this.client.subscribe(
+          `/topic/game/${this.sessionId}`,
+          (frame)=>{
+            console.log(frame.body);
+          },
+          ()=>{}
+      )
+    }
   },
 }
 </script>
