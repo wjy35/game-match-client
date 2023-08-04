@@ -11,18 +11,15 @@
 
     <div v-if="matchStatus===MatchStatus.MATCHED">
       <p>게임에 참가 하시겠습니까?</p>
-
+      <p>{{second}}</p>
       <button @click="enter">수락</button>
       <button @click="cancel">거절</button>
     </div>
 
-    <div v-if="matchStatus===MatchStatus.ENTERED">
-      <p>다른 참가자를 기다려 주세요!</p>
+    <div v-if="matchStatus===MatchStatus.CREATED">
+      <p>잠시후 시작합니다.</p>
     </div>
 
-    <div v-if="matchStatus===MatchStatus.STARTED">
-      <p>게임이 시작되었습니다.</p>
-    </div>
   </div>
 </template>
 
@@ -41,18 +38,15 @@ export default {
   data() {
     return {
       client : null,
-      gameId:"",
-      sessionId:"",
+      groupId:"",
+      memberId:"",
+      second: "",
       matchStatus: MatchStatus.READY,
-      game: {
-        status:0,
-      },
     }
   },
   methods: {
     match() {
       this.matchStatus = MatchStatus.MATCHING;
-      console.log(process.env.VUE_APP_MATCH_ENDPOINT_URL);
       this.client = Stomp.client(process.env.VUE_APP_MATCH_ENDPOINT_URL);
       this.client.connect(
           {},
@@ -62,16 +56,20 @@ export default {
                 (frame)=>{
                   let response = JSON.parse(frame.body);
                   if(response.success){
-                    this.matched = true;
-                    this.matchStatus = MatchStatus.MATCHED
-                    this.sessionId = response.sessionId;
-                    this.gameId = response.gameId;
+                    if(response.second){
+                      this.second = response.second;
+                    }else{
+                      this.matchStatus = response.matchStatus;
+                      this.memberId = response.memberId;
+                      this.groupId = response.groupId;
+
+                      // matchStatus 가 created 상태라면 game page로 memberId + groupId 와 함께 넘어가야함
+                    }
                   }
                 },
                 (error)=>{
                   console.log(error);
                 });
-            this.client.send("/start");
           },
           (error)=>{
             console.log(error)
@@ -79,34 +77,13 @@ export default {
       )
     },
     cancel(){
+      this.groupId = "";
+      this.memberId = "";
+      this.client.disconnect();
       this.matchStatus = MatchStatus.READY;
-      this.gameId = "";
-      this.sessionId = "",
-          this.client.disconnect();
     },
     enter(){
-      this.matchStatus = MatchStatus.ENTERED;
-      this.client.subscribe(`/topic/enter/${this.gameId}`,
-          (frame)=>{
-            let enterResult  = frame.body;
-            if(enterResult){
-              this.matchStatus = MatchStatus.STARTED;
-              this.client.subscribe(`/topic/game/${this.gameId}`,
-                  (frame)=>{
-                    this.game.status = frame.body;
-                  },
-                  ()=>{}
-              );
-              this.client.send(`/load/${this.gameId}/${this.sessionId}`);
-              this.client.unsubscribe(`/topic/enter/${this.gameId}`);
-              this.client.unsubscribe("/user/queue/match");
-            }
-          },
-          (error)=>{
-            console.log(error);
-          }
-      );
-      this.client.send(`/enter/${this.gameId}/${this.sessionId}`);
+      this.client.send(`/enter/${this.groupId}/${this.memberId}`);
     },
   },
 }
