@@ -23,6 +23,12 @@
       <p>{{memberId}}</p>
 
       <button @click="start">시작</button>
+      <hr>
+
+      <div id="gameResponses"></div>
+      <div>
+        <button @click="pick">good</button>
+      </div>
     </div>
 
   </div>
@@ -49,6 +55,7 @@ export default {
       matchStatus: MatchStatus.READY,
       sessionId:"",
       memberToken:"",
+      gameResponse:"",
     }
   },
   methods: {
@@ -131,11 +138,18 @@ export default {
       this.client.subscribe(
           `/topic/game/${this.sessionId}`,
           (frame)=>{
-            console.log(frame.body);
+            // let gameResponse = JSON.parse(frame.body);
+            let gameResponseString = frame.body;
+            document.getElementById("gameResponses").innerHTML += `<p>${gameResponseString}</p>`;
           },
-          ()=>{}
+          ()=>{
+
+          }
       )
-    }
+    },
+    pick(){
+      this.client.send(`/pick/${this.sessionId}`,JSON.stringify({type:1,keyword:"삼행시"}));
+    },
   },
 }
 </script>
